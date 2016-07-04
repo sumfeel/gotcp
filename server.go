@@ -17,6 +17,8 @@ type Server struct {
 	protocol  Protocol        // customize packet protocol
 	exitChan  chan struct{}   // notify all goroutines to shutdown
 	waitGroup *sync.WaitGroup // wait for all goroutines
+
+	extraData interface{} // to save extra data
 }
 
 // NewServer creates a server
@@ -55,7 +57,7 @@ func (s *Server) Start(listener *net.TCPListener, acceptTimeout time.Duration) {
 
 		s.waitGroup.Add(1)
 		go func() {
-			newConn(conn, s).Do()
+			NewConn(conn, s).Do()
 			s.waitGroup.Done()
 		}()
 	}
@@ -65,4 +67,14 @@ func (s *Server) Start(listener *net.TCPListener, acceptTimeout time.Duration) {
 func (s *Server) Stop() {
 	close(s.exitChan)
 	s.waitGroup.Wait()
+}
+
+// GetExtraData gets the extra data from the Conn
+func (s *Server) GetExtraData() interface{} {
+	return s.extraData
+}
+
+// PutExtraData puts the extra data with the Conn
+func (s *Server) PutExtraData(data interface{}) {
+	s.extraData = data
 }

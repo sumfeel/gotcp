@@ -1,6 +1,7 @@
 package gotcp
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"sync"
@@ -13,6 +14,7 @@ var (
 	ErrConnClosing   = errors.New("use of closed network connection")
 	ErrWriteBlocking = errors.New("write packet was blocking")
 	ErrReadBlocking  = errors.New("read packet was blocking")
+	ErrReadHalf      = errors.New("read half packet")
 )
 
 // Conn exposes a set of callbacks for the various events that occur on a connection
@@ -25,6 +27,10 @@ type Conn struct {
 	closeChan         chan struct{} // close chanel
 	packetSendChan    chan Packet   // packet send chanel
 	packetReceiveChan chan Packet   // packeet receive chanel
+
+	recieveBuffer *bytes.Buffer
+	timeflag      int64
+	//ticker        *time.Ticker
 }
 
 // ConnCallback is an interface of methods that are used as callbacks on a connection
@@ -42,14 +48,22 @@ type ConnCallback interface {
 }
 
 // newConn returns a wrapper of raw conn
-func newConn(conn *net.TCPConn, srv *Server) *Conn {
+func NewConn(conn *net.TCPConn, srv *Server) *Conn {
 	return &Conn{
 		srv:               srv,
 		conn:              conn,
 		closeChan:         make(chan struct{}),
 		packetSendChan:    make(chan Packet, srv.config.PacketSendChanLimit),
 		packetReceiveChan: make(chan Packet, srv.config.PacketReceiveChanLimit),
+
+		recieveBuffer: bytes.NewBuffer([]byte{}),
+		timeflag:      time.Now().Unix(),
+		//ticker:        time.NewTicker(60),
 	}
+}
+
+func (c *Conn) GetService() *Server {
+	return c.srv
 }
 
 // GetExtraData gets the extra data from the Conn
@@ -62,9 +76,21 @@ func (c *Conn) PutExtraData(data interface{}) {
 	c.extraData = data
 }
 
+func (c *Conn) GetRecvBytes() *bytes.Buffer {
+	return c.recieveBuffer
+}
+
 // GetRawConn returns the raw net.TCPConn from the Conn
 func (c *Conn) GetRawConn() *net.TCPConn {
 	return c.conn
+}
+
+func (c *Conn) SetRawConn(conn *net.TCPConn) {
+	c.conn = conn
+}
+
+func (c *Conn) SetTimeFlag(timeflag int64) {
+	c.timeflag = timeflag
 }
 
 // Close closes the connection
@@ -128,6 +154,7 @@ func (c *Conn) Do() {
 	asyncDo(c.handleLoop, c.srv.waitGroup)
 	asyncDo(c.readLoop, c.srv.waitGroup)
 	asyncDo(c.writeLoop, c.srv.waitGroup)
+	//asyncDo(c.checkHeartLoop, c.srv.waitGroup)
 }
 
 func (c *Conn) readLoop() {
@@ -147,12 +174,15 @@ func (c *Conn) readLoop() {
 		default:
 		}
 
-		p, err := c.srv.protocol.ReadPacket(c.conn)
-		if err != nil {
+		p, err := c.srv.protocol.ReadPacket(c)
+
+		if err != nil && err != ErrReadHalf {
 			return
 		}
 
-		c.packetReceiveChan <- p
+		if err != ErrReadHalf {
+			c.packetReceiveChan <- p
+		}
 	}
 }
 
@@ -205,6 +235,21 @@ func (c *Conn) handleLoop() {
 		}
 	}
 }
+
+//func (c *Conn) checkHeartLoop() {
+//	defer func() {
+//		recover()
+//		c.Close()
+//	}()
+
+//	for {
+//		<-c.ticker.C
+//		now := time.Now().Unix()
+//		if now-c.timeflag > 600 {
+//			return
+//		}
+//	}
+//}
 
 func asyncDo(fn func(), wg *sync.WaitGroup) {
 	wg.Add(1)

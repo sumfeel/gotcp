@@ -10,16 +10,16 @@ Usage
 ###Install
 
 ~~~
-go get github.com/gansidui/gotcp
+go get github.com/sumfeel/gotcp
 ~~~
 
 
 ###Examples
 
-* [echo](https://github.com/gansidui/gotcp/tree/master/examples/echo)
-* [telnet](https://github.com/gansidui/gotcp/tree/master/examples/telnet)
+* [echo](https://github.com/sumfeel/gotcp/tree/master/examples/echo)
+* [telnet](https://github.com/sumfeel/gotcp/tree/master/examples/telnet)
 
 Document
 ================
 
-[Doc](http://godoc.org/github.com/gansidui/gotcp)
+[Doc](http://godoc.org/github.com/sumfeel/gotcp)

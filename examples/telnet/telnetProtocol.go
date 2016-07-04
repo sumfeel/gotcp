@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/gansidui/gotcp"
+	"github.com/sumfeel/gotcp"
 )
 
 var (
